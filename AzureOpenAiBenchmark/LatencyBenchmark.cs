@@ -11,6 +11,9 @@ public class LatencyBenchmark
 {
     private const string Prompt = "Wyjaśnij mi czym jest człowiek.";
 
+    [Params("gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano")]
+    public string Deployment { get; set; } = "gpt-5.4-mini";
+
     private ChatClient _chatClient = null!;
     private ChatCompletionOptions _options = null!;
     private ChatMessage[] _messages = null!;
@@ -26,10 +29,9 @@ public class LatencyBenchmark
             ?? throw new InvalidOperationException("Brak sekretu 'AzureOpenAI:Endpoint'.");
         var apiKey = configuration["AzureOpenAI:ApiKey"]
             ?? throw new InvalidOperationException("Brak sekretu 'AzureOpenAI:ApiKey'.");
-        var deployment = configuration["AzureOpenAI:Deployment"] ?? "gpt-5.4-mini";
 
         var client = new AzureOpenAIClient(new Uri(endpoint), new ApiKeyCredential(apiKey));
-        _chatClient = client.GetChatClient(deployment);
+        _chatClient = client.GetChatClient(Deployment);
 
         _options = new ChatCompletionOptions
         {

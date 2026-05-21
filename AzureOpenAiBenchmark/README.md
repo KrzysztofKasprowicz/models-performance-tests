@@ -1,11 +1,13 @@
 # AzureOpenAiBenchmark
 
-Pomiar czasu odpowiedzi deploymentu Azure OpenAI (`gpt-5.4-mini`) z `reasoning_effort = none`
+Pomiar **TTFT** (time-to-first-token) deploymentów Azure OpenAI z `reasoning_effort = none`
 za pomocą [BenchmarkDotNet](https://benchmarkdotnet.org/).
 
-- **10 sekwencyjnych** zapytań mierzonych + **1 rozgrzewające** (`RunStrategy.Monitoring` — bez fazy
-  pilotażu, więc liczba płatnych wywołań jest dokładnie znana: **11**).
-- Raport zawiera **Min**, **Median** i **Max** (oraz domyślnie Mean/StdDev).
+- Porównywane modele (nazwy deploymentów zahardkodowane w `LatencyBenchmark.cs` → `[Params]`):
+  `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`. Każdy dostaje osobny wiersz Min/Median/Max.
+- Na model: **10 sekwencyjnych** zapytań mierzonych + **1 rozgrzewające**
+  (`RunStrategy.Monitoring` — bez fazy pilotażu). Łącznie **3 × 11 = 33** płatnych wywołań.
+- Mierzony jest czas do **pierwszego tokenu** (streaming, przerwanie po pierwszym tokenie).
 - Zapytanie: *"Wyjaśnij mi czym jest człowiek."*
 
 ## 1. Konfiguracja (user secrets)
@@ -16,10 +18,11 @@ za pomocą [BenchmarkDotNet](https://benchmarkdotnet.org/).
 ```bash
 cd AzureOpenAiBenchmark
 
-dotnet user-secrets set "AzureOpenAI:Endpoint"   "https://TWOJ-ZASOB.openai.azure.com/"
-dotnet user-secrets set "AzureOpenAI:ApiKey"     "WKLEJ-TUTAJ-KLUCZ"
-dotnet user-secrets set "AzureOpenAI:Deployment" "gpt-5.4-mini"
+dotnet user-secrets set "AzureOpenAI:Endpoint" "https://TWOJ-ZASOB.openai.azure.com/"
+dotnet user-secrets set "AzureOpenAI:ApiKey"   "WKLEJ-TUTAJ-KLUCZ"
 ```
+
+> Nazwy deploymentów są zahardkodowane (`[Params]` w `LatencyBenchmark.cs`) — nie podaje się ich w sekretach.
 
 Podgląd / weryfikacja zapisanych sekretów:
 
