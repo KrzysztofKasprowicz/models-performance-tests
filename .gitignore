@@ -1,0 +1,39 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugPublic/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# .NET / Visual Studio
+*.user
+*.suo
+*.userprefs
+.vs/
+*.dll
+*.pdb
+*.cache
+
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+project.lock.json
+project.assets.json
+
+# User secrets are stored outside the repo (~/.microsoft/usersecrets),
+# but never commit local secret files just in case:
+secrets.json
+appsettings.*.local.json
