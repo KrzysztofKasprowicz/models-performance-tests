@@ -25,6 +25,7 @@ public static class BenchmarkConfig
     public const int WarmupCallsPerModel = 1;
     public const int Iterations = 10;
     public const int CallsPerIteration = 5;
+    public static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(25);
 
     public static readonly DeploymentConfig[] Deployments =
     [

@@ -45,6 +45,7 @@ public sealed record MetricStats(
 public sealed record ModelStatistics(
     string Deployment,
     int SampleCount,
+    int TimedOutCount,
     MetricStats TtftMs,
     MetricStats TotalMs,
     MetricStats LengthChars)
@@ -52,6 +53,7 @@ public sealed record ModelStatistics(
     public static ModelStatistics From(ModelBenchmark benchmark) => new(
         benchmark.Deployment,
         benchmark.Results.Count,
+        benchmark.Results.Count(r => r.TimedOut),
         MetricStats.From(benchmark.Results.Select(r => r.TimeToFirstToken.TotalMilliseconds)),
         MetricStats.From(benchmark.Results.Select(r => r.TotalResponseTime.TotalMilliseconds)),
         MetricStats.From(benchmark.Results.Select(r => (double)r.ResponseLength)));

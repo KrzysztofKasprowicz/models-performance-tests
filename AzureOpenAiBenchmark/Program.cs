@@ -42,11 +42,13 @@ void OnCallCompleted(string deployment, CallResult result)
         current = completed;
     }
 
-    Console.WriteLine(
-        $"[{current,3}/{totalCalls}] {deployment,-22} " +
-        $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
-        $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
-        $"Length={result.ResponseLength,5} chars");
+    var status = result.TimedOut
+        ? $"TIMEOUT after {result.TotalResponseTime.TotalMilliseconds,8:F1} ms  Length={result.ResponseLength,5} chars (partial)"
+        : $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
+          $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
+          $"Length={result.ResponseLength,5} chars";
+
+    Console.WriteLine($"[{current,3}/{totalCalls}] {deployment,-22} {status}");
 }
 
 var stopwatch = System.Diagnostics.Stopwatch.StartNew();

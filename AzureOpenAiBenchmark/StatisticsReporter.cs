@@ -17,7 +17,8 @@ public static class StatisticsReporter
             PrintRow(s.Deployment, "TTFT", s.TtftMs, "F1");
             PrintRow(string.Empty, "Total", s.TotalMs, "F1");
             PrintRow(string.Empty, "Length", s.LengthChars, "F0", "   (chars)");
-            Console.WriteLine($"{string.Empty,-15} samples: {s.SampleCount}");
+            var timeoutNote = s.TimedOutCount > 0 ? $", timeouts: {s.TimedOutCount} (>{BenchmarkConfig.CallTimeout.TotalSeconds:F0}s)" : string.Empty;
+            Console.WriteLine($"{string.Empty,-15} samples: {s.SampleCount}{timeoutNote}");
             Console.WriteLine(new string('-', 110));
         }
     }

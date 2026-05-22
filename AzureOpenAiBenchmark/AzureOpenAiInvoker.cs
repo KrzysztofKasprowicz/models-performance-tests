@@ -26,31 +26,43 @@ public sealed class AzureOpenAiInvoker : IModelInvoker
 
     public async Task<CallResult> MeasureSingleCallAsync(CancellationToken cancellationToken)
     {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(BenchmarkConfig.CallTimeout);
+
         var stopwatch = Stopwatch.StartNew();
         TimeSpan? timeToFirstToken = null;
         var responseLength = 0;
+        var timedOut = false;
 
-        await foreach (var update in _chatClient
-                           .CompleteChatStreamingAsync(_messages, _options, cancellationToken)
-                           .ConfigureAwait(false))
+        try
         {
-            foreach (var part in update.ContentUpdate)
+            await foreach (var update in _chatClient
+                               .CompleteChatStreamingAsync(_messages, _options, timeoutCts.Token)
+                               .ConfigureAwait(false))
             {
-                if (string.IsNullOrEmpty(part.Text))
+                foreach (var part in update.ContentUpdate)
                 {
-                    continue;
-                }
+                    if (string.IsNullOrEmpty(part.Text))
+                    {
+                        continue;
+                    }
 
-                timeToFirstToken ??= stopwatch.Elapsed;
-                responseLength += part.Text.Length;
+                    timeToFirstToken ??= stopwatch.Elapsed;
+                    responseLength += part.Text.Length;
+                }
             }
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            timedOut = true;
         }
 
         stopwatch.Stop();
         return new CallResult(
             timeToFirstToken ?? stopwatch.Elapsed,
             stopwatch.Elapsed,
-            responseLength);
+            responseLength,
+            timedOut);
     }
 
     private static bool TryGetReasoningEffortLevel(string? value, out ChatReasoningEffortLevel level)

@@ -77,7 +77,9 @@ public static class PdfReportGenerator
             col.Item().Text($"Iterations per model: {BenchmarkConfig.Iterations}");
             col.Item().Text($"Parallel calls per iteration: {BenchmarkConfig.CallsPerIteration}");
             col.Item().Text($"Warm-up calls per model: {BenchmarkConfig.WarmupCallsPerModel}");
+            col.Item().Text($"Per-call timeout: {BenchmarkConfig.CallTimeout.TotalSeconds:F0} s");
             col.Item().Text($"Total billed calls: {stats.Sum(s => s.SampleCount)}");
+            col.Item().Text($"Timed-out calls: {stats.Sum(s => s.TimedOutCount)}");
             col.Item().Text($"Wall-clock duration: {wallClock.TotalSeconds:F1} s");
         });
     }
@@ -163,7 +165,10 @@ public static class PdfReportGenerator
 
                 foreach (var s in stats)
                 {
-                    AppendMetricRow(table, s.Deployment, "TTFT (ms)", s.TtftMs, "F1", topBorder: true);
+                    var modelLabel = s.TimedOutCount > 0
+                        ? $"{s.Deployment}\n({s.TimedOutCount} timeout{(s.TimedOutCount == 1 ? string.Empty : "s")})"
+                        : s.Deployment;
+                    AppendMetricRow(table, modelLabel, "TTFT (ms)", s.TtftMs, "F1", topBorder: true);
                     AppendMetricRow(table, string.Empty, "Total (ms)", s.TotalMs, "F1");
                     AppendMetricRow(table, string.Empty, "Length (chars)", s.LengthChars, "F0");
                 }
