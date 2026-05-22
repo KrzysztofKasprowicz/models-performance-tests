@@ -1,6 +1,15 @@
 namespace AzureOpenAiBenchmark;
 
-public sealed record DeploymentConfig(string Name, bool IsReasoningModel);
+public abstract record DeploymentConfig(string Name);
+
+public sealed record AzureOpenAiDeployment(string Name, bool IsReasoningModel)
+    : DeploymentConfig(Name);
+
+public sealed record FoundryInferenceDeployment(string Name)
+    : DeploymentConfig(Name);
+
+public sealed record ClaudeFoundryDeployment(string Name)
+    : DeploymentConfig(Name);
 
 public static class BenchmarkConfig
 {
@@ -10,13 +19,20 @@ public static class BenchmarkConfig
 
     public static readonly DeploymentConfig[] Deployments =
     [
-        new("gpt-5.4", IsReasoningModel: true),
-        new("gpt-5.4-mini", IsReasoningModel: true),
-        new("gpt-5.4-nano", IsReasoningModel: true),
-        new("gpt-5.1", IsReasoningModel: true),
-        new("gpt-4.1", IsReasoningModel: false),
-        new("gpt-4.1-mini", IsReasoningModel: false),
-        new("gpt-4.1-nano", IsReasoningModel: false),
+        new AzureOpenAiDeployment("gpt-5.4", IsReasoningModel: true),
+        new AzureOpenAiDeployment("gpt-5.4-mini", IsReasoningModel: true),
+        new AzureOpenAiDeployment("gpt-5.4-nano", IsReasoningModel: true),
+
+        // Temporarily disabled — uncomment to re-enable.
+        // new AzureOpenAiDeployment("gpt-5.1", IsReasoningModel: true),
+        // new AzureOpenAiDeployment("gpt-4.1", IsReasoningModel: false),
+        // new AzureOpenAiDeployment("gpt-4.1-mini", IsReasoningModel: false),
+        // new AzureOpenAiDeployment("gpt-4.1-nano", IsReasoningModel: false),
+
+        new FoundryInferenceDeployment("Kimi-K2.6"),
+        new FoundryInferenceDeployment("DeepSeek-V4-Flash"),
+        new ClaudeFoundryDeployment("claude-sonnet-4-6"),
+        new ClaudeFoundryDeployment("claude-haiku-4-5"),
     ];
 
     public const string Prompt =

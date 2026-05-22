@@ -1,4 +1,5 @@
 using Azure.AI.OpenAI;
+using Azure.Core;
 using Azure.Identity;
 using AzureOpenAiBenchmark;
 using Microsoft.Extensions.Configuration;
@@ -7,13 +8,19 @@ var configuration = new ConfigurationBuilder()
     .AddUserSecrets(typeof(ModelBenchmark).Assembly)
     .Build();
 
-var endpoint = configuration["AzureOpenAI:Endpoint"]
-    ?? throw new InvalidOperationException("Missing user secret 'AzureOpenAI:Endpoint'.");
+var resourceName = configuration["AzureFoundry:ResourceName"]
+    ?? throw new InvalidOperationException("Missing user secret 'AzureFoundry:ResourceName'.");
 
-var openAiClient = new AzureOpenAIClient(new Uri(endpoint), new AzureCliCredential());
+var azureOpenAiEndpoint = new Uri($"https://{resourceName}.openai.azure.com/");
+var foundryEndpoint = new Uri($"https://{resourceName}.services.ai.azure.com/");
+var foundryInferenceEndpoint = new Uri(foundryEndpoint, "models");
+
+TokenCredential credential = new AzureCliCredential();
+var azureOpenAiClient = new AzureOpenAIClient(azureOpenAiEndpoint, credential);
+var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
 var benchmarks = BenchmarkConfig.Deployments
-    .Select(deployment => new ModelBenchmark(deployment, openAiClient.GetChatClient(deployment.Name)))
+    .Select(d => new ModelBenchmark(CreateInvoker(d)))
     .ToArray();
 
 Console.WriteLine($"Warm-up: {BenchmarkConfig.WarmupCallsPerModel} call(s) per model...");
@@ -38,7 +45,7 @@ void OnCallCompleted(string deployment, CallResult result)
     }
 
     Console.WriteLine(
-        $"[{current,3}/{totalCalls}] {deployment,-15} " +
+        $"[{current,3}/{totalCalls}] {deployment,-22} " +
         $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
         $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
         $"Length={result.ResponseLength,5} chars");
@@ -63,3 +70,11 @@ var outputDirectory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "
 var pdfPath = PdfReportGenerator.Save(stats, stopwatch.Elapsed, DateTimeOffset.Now, outputDirectory);
 Console.WriteLine();
 Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");
+
+IModelInvoker CreateInvoker(DeploymentConfig deployment) => deployment switch
+{
+    AzureOpenAiDeployment aoai => new AzureOpenAiInvoker(aoai, azureOpenAiClient, BenchmarkConfig.Prompt),
+    FoundryInferenceDeployment fi => new FoundryInferenceInvoker(fi, foundryInferenceEndpoint, credential, BenchmarkConfig.Prompt),
+    ClaudeFoundryDeployment claude => new ClaudeFoundryInvoker(claude, foundryEndpoint, credential, BenchmarkConfig.Prompt, httpClient),
+    _ => throw new InvalidOperationException($"Unknown deployment type: {deployment.GetType().Name}"),
+};

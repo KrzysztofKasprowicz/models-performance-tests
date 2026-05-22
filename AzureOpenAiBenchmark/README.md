@@ -1,18 +1,36 @@
 # AzureOpenAiBenchmark
 
-Parallel benchmark for Azure OpenAI deployments that measures **TTFT**
+Parallel benchmark for Azure AI Foundry deployments that measures **TTFT**
 (time-to-first-token) and **total response time**. A custom runner is used
 instead of BenchmarkDotNet because BDN does not support intra-benchmark
 parallelism nor capturing two timing metrics per call.
 
+The benchmark targets three model families on the same Foundry resource,
+each reached through a different API surface:
+
+| Provider                | SDK / Transport               | Endpoint path                                      |
+|-------------------------|-------------------------------|----------------------------------------------------|
+| Azure OpenAI (`gpt-*`)  | `Azure.AI.OpenAI`             | `https://<resource>.openai.azure.com/`             |
+| Foundry Inference       | `Azure.AI.Inference`          | `https://<resource>.services.ai.azure.com/models`  |
+| Anthropic on Foundry    | raw `HttpClient` (SSE)        | `https://<resource>.services.ai.azure.com/anthropic/v1/messages` |
+
+All three share a single `AzureCliCredential` (Microsoft Entra ID, keyless).
+
 ## Test plan
 
-- Seven deployments (`BenchmarkConfig.Deployments`):
-  - reasoning models (with `reasoning_effort = none`): `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.1`
-  - non-reasoning models (`reasoning_effort` not sent): `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
+Currently enabled deployments (`BenchmarkConfig.Deployments`):
+
+- Azure OpenAI: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (with `reasoning_effort = none`)
+- Foundry Inference: `Kimi-K2.6`, `DeepSeek-V4-Flash` (`enable_thinking = false` sent best-effort)
+- Anthropic on Foundry: `claude-sonnet-4-6`, `claude-haiku-4-5` (`thinking.type = disabled`)
+
+Disabled (commented out, easy to re-enable): `gpt-5.1`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`.
+
+Per-run shape:
+
 - All models run **in parallel** (`Task.WhenAll` over models).
 - Per model: **10 iterations × 5 parallel calls** = 50 requests per model.
-- Totals: **7 × 50 = 350** billed calls + **1 warm-up** call per model (7 extra).
+- Plus **1 warm-up** call per model.
 - The prompt is designed to produce responses of comparable length
   (four paragraphs of two sentences, 15–20 words per sentence).
 
@@ -35,30 +53,28 @@ The `output/` directory is git-ignored.
 
 ## 1. Authorization (Azure CLI)
 
-Authorization uses `AzureCliCredential` (Microsoft Entra ID, keyless).
-Sign in beforehand to the tenant/subscription that has access to the
-Azure OpenAI resource:
-
 ```bash
 az login
 az account set --subscription "<SUBSCRIPTION-NAME-OR-ID>"
 ```
 
-The identity used by `az` must have the
-**Cognitive Services OpenAI User** role (or equivalent) on the
-Azure OpenAI resource.
+The identity must have:
+
+- **Cognitive Services OpenAI User** — for Azure OpenAI deployments.
+- **Azure AI Developer** (or higher) on the Foundry resource — for Foundry
+  Inference and the Anthropic endpoint.
 
 ## 2. Configuration (user secrets)
 
-`Endpoint` is the **resource base URL** (without the `/openai/deployments/...` path):
+Only the resource name is stored; endpoints are derived from it.
 
 ```bash
 cd AzureOpenAiBenchmark
 
-dotnet user-secrets set "AzureOpenAI:Endpoint" "https://YOUR-RESOURCE.openai.azure.com/"
+dotnet user-secrets set "AzureFoundry:ResourceName" "ailadevai"
 ```
 
-Verify stored secrets:
+Verify:
 
 ```bash
 dotnet user-secrets list
@@ -74,8 +90,8 @@ dotnet run -c Release
 
 In `BenchmarkConfig.cs`:
 
-- `Deployments` — list of deployment names to compare.
-- `Iterations` — number of sequential iterations per model (default `10`).
-- `CallsPerIteration` — number of parallel calls within a single iteration (default `5`).
-- `WarmupCallsPerModel` — number of warm-up calls per model (default `1`).
+- `Deployments` — list of deployment configs (Azure OpenAI / Foundry Inference / Claude).
+- `Iterations` — sequential iterations per model (default `10`).
+- `CallsPerIteration` — parallel calls within one iteration (default `5`).
+- `WarmupCallsPerModel` — warm-up calls per model (default `1`).
 - `Prompt` — request body (designed for stable response length).

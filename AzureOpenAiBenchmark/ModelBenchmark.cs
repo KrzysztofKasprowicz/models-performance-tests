@@ -1,37 +1,24 @@
-using System.Diagnostics;
-using OpenAI.Chat;
-
 namespace AzureOpenAiBenchmark;
 
 public sealed class ModelBenchmark
 {
-    private readonly ChatClient _chatClient;
-    private readonly ChatCompletionOptions _options;
-    private readonly ChatMessage[] _messages;
-
-    public string Deployment { get; }
-    public IReadOnlyList<CallResult> Results => _results;
-
+    private readonly IModelInvoker _invoker;
     private readonly List<CallResult> _results = new();
     private readonly object _resultsLock = new();
 
-    public ModelBenchmark(DeploymentConfig deployment, ChatClient chatClient)
+    public string Deployment => _invoker.Deployment;
+    public IReadOnlyList<CallResult> Results => _results;
+
+    public ModelBenchmark(IModelInvoker invoker)
     {
-        Deployment = deployment.Name;
-        _chatClient = chatClient;
-        _options = new ChatCompletionOptions();
-        if (deployment.IsReasoningModel)
-        {
-            _options.ReasoningEffortLevel = ChatReasoningEffortLevel.None;
-        }
-        _messages = [new UserChatMessage(BenchmarkConfig.Prompt)];
+        _invoker = invoker;
     }
 
     public async Task WarmUpAsync(int calls, CancellationToken cancellationToken = default)
     {
         for (var i = 0; i < calls; i++)
         {
-            _ = await MeasureSingleCallAsync(cancellationToken);
+            _ = await _invoker.MeasureSingleCallAsync(cancellationToken);
         }
     }
 
@@ -46,7 +33,7 @@ public sealed class ModelBenchmark
             var tasks = Enumerable.Range(0, callsPerIteration)
                 .Select(async _ =>
                 {
-                    var result = await MeasureSingleCallAsync(cancellationToken);
+                    var result = await _invoker.MeasureSingleCallAsync(cancellationToken);
                     lock (_resultsLock)
                     {
                         _results.Add(result);
@@ -58,35 +45,5 @@ public sealed class ModelBenchmark
 
             await Task.WhenAll(tasks);
         }
-    }
-
-    private async Task<CallResult> MeasureSingleCallAsync(CancellationToken cancellationToken)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        TimeSpan? timeToFirstToken = null;
-        var responseLength = 0;
-
-        await foreach (var update in _chatClient
-                           .CompleteChatStreamingAsync(_messages, _options, cancellationToken)
-                           .ConfigureAwait(false))
-        {
-            foreach (var part in update.ContentUpdate)
-            {
-                if (string.IsNullOrEmpty(part.Text))
-                {
-                    continue;
-                }
-
-                timeToFirstToken ??= stopwatch.Elapsed;
-                responseLength += part.Text.Length;
-            }
-        }
-
-        stopwatch.Stop();
-
-        return new CallResult(
-            timeToFirstToken ?? stopwatch.Elapsed,
-            stopwatch.Elapsed,
-            responseLength);
     }
 }
