@@ -14,9 +14,9 @@ public static class BenchmarkConfig
     ];
 
     public const string Prompt =
-        "Odpowiedz dokładnie czterema akapitami po dwa zdania każdy. " +
-        "Wyjaśnij krótko: (1) czym jest fotosynteza, (2) jakie są jej główne etapy, " +
-        "(3) jakie ma znaczenie dla życia na Ziemi, (4) jak wykorzystywana jest w rolnictwie. " +
-        "Każde zdanie powinno mieć od 15 do 20 słów. " +
-        "Nie używaj list, nagłówków ani znaków formatowania Markdown.";
+        "Reply with exactly four paragraphs of two sentences each. " +
+        "Briefly explain: (1) what photosynthesis is, (2) its main stages, " +
+        "(3) its importance for life on Earth, (4) how it is applied in agriculture. " +
+        "Each sentence must contain between 15 and 20 words. " +
+        "Reply in English. Do not use lists, headings, or any Markdown formatting.";
 }

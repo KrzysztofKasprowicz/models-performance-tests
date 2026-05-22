@@ -6,7 +6,7 @@ public static class StatisticsReporter
     {
         Console.WriteLine();
         Console.WriteLine(new string('=', 110));
-        Console.WriteLine("Wyniki (czasy w ms)");
+        Console.WriteLine("Results (times in ms)");
         Console.WriteLine(new string('=', 110));
         Console.WriteLine(
             $"{"Model",-15} {"Metric",-8} {"Min",10} {"Avg",10} {"P50",10} {"P75",10} {"P95",10} {"Max",10}");

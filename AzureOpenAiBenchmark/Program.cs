@@ -8,7 +8,7 @@ var configuration = new ConfigurationBuilder()
     .Build();
 
 var endpoint = configuration["AzureOpenAI:Endpoint"]
-    ?? throw new InvalidOperationException("Brak sekretu 'AzureOpenAI:Endpoint'.");
+    ?? throw new InvalidOperationException("Missing user secret 'AzureOpenAI:Endpoint'.");
 
 var openAiClient = new AzureOpenAIClient(new Uri(endpoint), new AzureCliCredential());
 
@@ -16,14 +16,14 @@ var benchmarks = BenchmarkConfig.Deployments
     .Select(deployment => new ModelBenchmark(deployment, openAiClient.GetChatClient(deployment)))
     .ToArray();
 
-Console.WriteLine($"Rozgrzewka: {BenchmarkConfig.WarmupCallsPerModel} wywołań na model...");
+Console.WriteLine($"Warm-up: {BenchmarkConfig.WarmupCallsPerModel} call(s) per model...");
 await Task.WhenAll(benchmarks.Select(b => b.WarmUpAsync(BenchmarkConfig.WarmupCallsPerModel)));
 
 var totalCalls = benchmarks.Length * BenchmarkConfig.Iterations * BenchmarkConfig.CallsPerIteration;
 Console.WriteLine(
-    $"Start: {benchmarks.Length} modele równolegle, " +
-    $"{BenchmarkConfig.Iterations} iteracji x {BenchmarkConfig.CallsPerIteration} wywołań na iterację. " +
-    $"Łącznie {totalCalls} płatnych zapytań.");
+    $"Starting: {benchmarks.Length} models in parallel, " +
+    $"{BenchmarkConfig.Iterations} iterations x {BenchmarkConfig.CallsPerIteration} calls per iteration. " +
+    $"Total {totalCalls} billed requests.");
 
 var completed = 0;
 var progressLock = new object();
@@ -54,6 +54,6 @@ await Task.WhenAll(benchmarks.Select(b => b.RunAsync(
 stopwatch.Stop();
 
 Console.WriteLine();
-Console.WriteLine($"Łączny czas testu (wall-clock): {stopwatch.Elapsed.TotalSeconds:F1} s");
+Console.WriteLine($"Total wall-clock time: {stopwatch.Elapsed.TotalSeconds:F1} s");
 
 StatisticsReporter.Print(benchmarks);

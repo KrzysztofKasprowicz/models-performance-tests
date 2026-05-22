@@ -1,70 +1,73 @@
 # AzureOpenAiBenchmark
 
-Równoległy pomiar **TTFT** (time-to-first-token) i **całkowitego czasu odpowiedzi**
-deploymentów Azure OpenAI z `reasoning_effort = none`. Własny runner (bez BenchmarkDotNet),
-bo BDN nie wspiera dobrze równoległości w obrębie jednego benchmarku ani pomiaru dwóch
-metryk per wywołanie.
+Parallel benchmark for Azure OpenAI deployments that measures **TTFT**
+(time-to-first-token) and **total response time** with `reasoning_effort = none`.
+A custom runner is used instead of BenchmarkDotNet because BDN does not
+support intra-benchmark parallelism nor capturing two timing metrics per call.
 
-## Plan testu
+## Test plan
 
-- Trzy modele: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (`BenchmarkConfig.Deployments`).
-- Modele są testowane **równolegle względem siebie** (`Task.WhenAll` po modelach).
-- Każdy model: **10 iteracji × 5 równoległych wywołań** = 50 zapytań na model.
-- Łącznie **3 × 50 = 150** płatnych wywołań + **1 rozgrzewające** na model (3 dodatkowe).
-- Prompt jest zaprojektowany tak, by wymusić odpowiedzi o zbliżonej długości
-  (cztery akapity po dwa zdania, 15–20 słów na zdanie).
+- Three models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (`BenchmarkConfig.Deployments`).
+- All models run **in parallel** (`Task.WhenAll` over models).
+- Per model: **10 iterations × 5 parallel calls** = 50 requests per model.
+- Totals: **3 × 50 = 150** billed calls + **1 warm-up** call per model (3 extra).
+- The prompt is designed to produce responses of comparable length
+  (four paragraphs of two sentences, 15–20 words per sentence).
 
-## Mierzone metryki (per wywołanie)
+## Per-call metrics
 
-- **TTFT** — czas od wysłania żądania do pierwszego niepustego tokenu w streamie.
-- **Total** — czas od wysłania żądania do zamknięcia streama.
-- **Length** — długość pełnej odpowiedzi w znakach.
+- **TTFT** — time from request start to the first non-empty streamed token.
+- **Total** — time from request start to the end of the response stream.
+- **Length** — total response length in characters.
 
-## Statystyki (per model)
+## Per-model statistics
 
-Min / Avg / Median / P95 / Max dla TTFT, Total i Length. Dodatkowo wall-clock całego testu.
+Min / Avg / P50 / P75 / P95 / Max for TTFT, Total, and Length.
+The overall wall-clock duration is also printed.
 
-## 1. Autoryzacja (Azure CLI)
+## 1. Authorization (Azure CLI)
 
-Autoryzacja odbywa się przez `AzureCliCredential` (Microsoft Entra ID, keyless).
-Zaloguj się wcześniej do tej tenant/sub, która ma dostęp do zasobu OpenAI:
+Authorization uses `AzureCliCredential` (Microsoft Entra ID, keyless).
+Sign in beforehand to the tenant/subscription that has access to the
+Azure OpenAI resource:
 
 ```bash
 az login
-az account set --subscription "<NAZWA-LUB-ID-SUBSKRYPCJI>"
+az account set --subscription "<SUBSCRIPTION-NAME-OR-ID>"
 ```
 
-Identity używana przez `az` musi mieć przypisaną rolę
-**Cognitive Services OpenAI User** (lub równoważną) na zasobie Azure OpenAI.
+The identity used by `az` must have the
+**Cognitive Services OpenAI User** role (or equivalent) on the
+Azure OpenAI resource.
 
-## 2. Konfiguracja (user secrets)
+## 2. Configuration (user secrets)
 
-`Endpoint` to **bazowy adres zasobu** (bez ścieżki `/openai/deployments/...`):
+`Endpoint` is the **resource base URL** (without the `/openai/deployments/...` path):
 
 ```bash
 cd AzureOpenAiBenchmark
 
-dotnet user-secrets set "AzureOpenAI:Endpoint" "https://TWOJ-ZASOB.openai.azure.com/"
+dotnet user-secrets set "AzureOpenAI:Endpoint" "https://YOUR-RESOURCE.openai.azure.com/"
 ```
 
-Podgląd zapisanych sekretów:
+Verify stored secrets:
 
 ```bash
 dotnet user-secrets list
 ```
 
-## 3. Uruchomienie
+## 3. Run
 
 ```bash
 dotnet run -c Release
 ```
 
-## Strojenie
+## Tuning
 
-W `BenchmarkConfig.cs`:
+In `BenchmarkConfig.cs`:
 
-- `Deployments` — lista nazw deploymentów do porównania.
-- `Iterations` — liczba sekwencyjnych iteracji na model (domyślnie `10`).
-- `CallsPerIteration` — liczba równoległych wywołań w obrębie jednej iteracji (domyślnie `5`).
-- `WarmupCallsPerModel` — liczba rozgrzewających wywołań na model (domyślnie `1`).
-- `Prompt` — treść zapytania (zaprojektowana pod stabilną długość odpowiedzi).
+- `Deployments` — list of deployment names to compare.
+- `Iterations` — number of sequential iterations per model (default `10`).
+- `CallsPerIteration` — number of parallel calls within a single iteration (default `5`).
+- `WarmupCallsPerModel` — number of warm-up calls per model (default `1`).
+- `Prompt` — request body (designed for stable response length).
