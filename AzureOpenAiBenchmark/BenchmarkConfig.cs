@@ -1,16 +1,22 @@
 namespace AzureOpenAiBenchmark;
 
+public sealed record DeploymentConfig(string Name, bool IsReasoningModel);
+
 public static class BenchmarkConfig
 {
     public const int WarmupCallsPerModel = 1;
     public const int Iterations = 10;
     public const int CallsPerIteration = 5;
 
-    public static readonly string[] Deployments =
+    public static readonly DeploymentConfig[] Deployments =
     [
-        "gpt-5.4",
-        "gpt-5.4-mini",
-        "gpt-5.4-nano",
+        new("gpt-5.4", IsReasoningModel: true),
+        new("gpt-5.4-mini", IsReasoningModel: true),
+        new("gpt-5.4-nano", IsReasoningModel: true),
+        new("gpt-5.1", IsReasoningModel: true),
+        new("gpt-4.1", IsReasoningModel: false),
+        new("gpt-4.1-mini", IsReasoningModel: false),
+        new("gpt-4.1-nano", IsReasoningModel: false),
     ];
 
     public const string Prompt =

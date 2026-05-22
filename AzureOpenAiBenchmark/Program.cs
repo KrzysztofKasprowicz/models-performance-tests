@@ -13,7 +13,7 @@ var endpoint = configuration["AzureOpenAI:Endpoint"]
 var openAiClient = new AzureOpenAIClient(new Uri(endpoint), new AzureCliCredential());
 
 var benchmarks = BenchmarkConfig.Deployments
-    .Select(deployment => new ModelBenchmark(deployment, openAiClient.GetChatClient(deployment)))
+    .Select(deployment => new ModelBenchmark(deployment, openAiClient.GetChatClient(deployment.Name)))
     .ToArray();
 
 Console.WriteLine($"Warm-up: {BenchmarkConfig.WarmupCallsPerModel} call(s) per model...");

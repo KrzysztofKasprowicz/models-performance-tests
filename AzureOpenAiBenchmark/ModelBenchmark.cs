@@ -15,14 +15,15 @@ public sealed class ModelBenchmark
     private readonly List<CallResult> _results = new();
     private readonly object _resultsLock = new();
 
-    public ModelBenchmark(string deployment, ChatClient chatClient)
+    public ModelBenchmark(DeploymentConfig deployment, ChatClient chatClient)
     {
-        Deployment = deployment;
+        Deployment = deployment.Name;
         _chatClient = chatClient;
-        _options = new ChatCompletionOptions
+        _options = new ChatCompletionOptions();
+        if (deployment.IsReasoningModel)
         {
-            ReasoningEffortLevel = ChatReasoningEffortLevel.None,
-        };
+            _options.ReasoningEffortLevel = ChatReasoningEffortLevel.None;
+        }
         _messages = [new UserChatMessage(BenchmarkConfig.Prompt)];
     }
 

@@ -1,16 +1,18 @@
 # AzureOpenAiBenchmark
 
 Parallel benchmark for Azure OpenAI deployments that measures **TTFT**
-(time-to-first-token) and **total response time** with `reasoning_effort = none`.
-A custom runner is used instead of BenchmarkDotNet because BDN does not
-support intra-benchmark parallelism nor capturing two timing metrics per call.
+(time-to-first-token) and **total response time**. A custom runner is used
+instead of BenchmarkDotNet because BDN does not support intra-benchmark
+parallelism nor capturing two timing metrics per call.
 
 ## Test plan
 
-- Three models: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (`BenchmarkConfig.Deployments`).
+- Seven deployments (`BenchmarkConfig.Deployments`):
+  - reasoning models (with `reasoning_effort = none`): `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.1`
+  - non-reasoning models (`reasoning_effort` not sent): `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
 - All models run **in parallel** (`Task.WhenAll` over models).
 - Per model: **10 iterations × 5 parallel calls** = 50 requests per model.
-- Totals: **3 × 50 = 150** billed calls + **1 warm-up** call per model (3 extra).
+- Totals: **7 × 50 = 350** billed calls + **1 warm-up** call per model (7 extra).
 - The prompt is designed to produce responses of comparable length
   (four paragraphs of two sentences, 15–20 words per sentence).
 
