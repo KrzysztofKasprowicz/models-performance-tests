@@ -15,6 +15,8 @@ public static class PdfReportGenerator
         IReadOnlyList<ModelStatistics> stats,
         TimeSpan wallClock,
         DateTimeOffset generatedAt,
+        string resourceName,
+        Uri endpoint,
         string outputDirectory)
     {
         QuestPDF.Settings.License = LicenseType.Community;
@@ -45,7 +47,7 @@ public static class PdfReportGenerator
                 page.Content().PaddingVertical(15).Column(col =>
                 {
                     col.Spacing(20);
-                    BuildSummary(col.Item(), stats, wallClock);
+                    BuildSummary(col.Item(), stats, wallClock, resourceName, endpoint);
                     BuildRankingSection(col.Item(), stats);
                     BuildDetailsSection(col.Item(), stats);
                 });
@@ -67,12 +69,16 @@ public static class PdfReportGenerator
     private static void BuildSummary(
         IContainer container,
         IReadOnlyList<ModelStatistics> stats,
-        TimeSpan wallClock)
+        TimeSpan wallClock,
+        string resourceName,
+        Uri endpoint)
     {
         container.Background(AccentColor).Padding(12).Column(col =>
         {
             col.Spacing(4);
             col.Item().Text("Configuration").FontSize(13).Bold().FontColor(PrimaryColor);
+            col.Item().Text($"Foundry resource: {resourceName}");
+            col.Item().Text($"Endpoint: {endpoint}");
             col.Item().Text($"Models tested: {stats.Count}");
             col.Item().Text($"Iterations per model: {BenchmarkConfig.Iterations}");
             col.Item().Text($"Parallel calls per iteration: {BenchmarkConfig.CallsPerIteration}");

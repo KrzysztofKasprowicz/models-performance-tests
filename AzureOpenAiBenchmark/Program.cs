@@ -67,7 +67,7 @@ var stats = benchmarks.Select(ModelStatistics.From).ToArray();
 StatisticsReporter.PrintConsole(stats);
 
 var outputDirectory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "output");
-var pdfPath = PdfReportGenerator.Save(stats, stopwatch.Elapsed, DateTimeOffset.Now, outputDirectory);
+var pdfPath = PdfReportGenerator.Save(stats, stopwatch.Elapsed, DateTimeOffset.Now, resourceName, foundryEndpoint, outputDirectory);
 Console.WriteLine();
 Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");
 
