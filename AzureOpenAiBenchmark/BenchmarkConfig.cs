@@ -1,34 +1,22 @@
-using BenchmarkDotNet.Columns;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Engines;
-using BenchmarkDotNet.Jobs;
-
 namespace AzureOpenAiBenchmark;
 
-/// <summary>
-/// Konfiguracja dostrojona do pomiaru opóźnień sieciowych (a nie mikrobenchmarków CPU):
-/// strategia Monitoring wyłącza fazę pilotażu, więc wykonujemy DOKŁADNIE tyle wywołań,
-/// ile zdefiniowano — 1 rozgrzewające + 10 mierzonych = 11 płatnych zapytań do API.
-/// </summary>
-public sealed class BenchmarkConfig : ManualConfig
+public static class BenchmarkConfig
 {
-    public const int WarmupCount = 1;
-    public const int MeasuredIterations = 10;
+    public const int WarmupCallsPerModel = 1;
+    public const int Iterations = 10;
+    public const int CallsPerIteration = 5;
 
-    public BenchmarkConfig()
-    {
-        AddColumnProvider(DefaultColumnProviders.Instance);
-        AddColumn(StatisticColumn.Min, StatisticColumn.Median, StatisticColumn.Max);
+    public static readonly string[] Deployments =
+    [
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+    ];
 
-        AddLogger(BenchmarkDotNet.Loggers.ConsoleLogger.Default);
-        AddExporter(BenchmarkDotNet.Exporters.MarkdownExporter.GitHub);
-
-        AddJob(Job.Default
-            .WithStrategy(RunStrategy.Monitoring)
-            .WithLaunchCount(1)
-            .WithWarmupCount(WarmupCount)
-            .WithIterationCount(MeasuredIterations)
-            .WithInvocationCount(1)
-            .WithUnrollFactor(1));
-    }
+    public const string Prompt =
+        "Odpowiedz dokładnie czterema akapitami po dwa zdania każdy. " +
+        "Wyjaśnij krótko: (1) czym jest fotosynteza, (2) jakie są jej główne etapy, " +
+        "(3) jakie ma znaczenie dla życia na Ziemi, (4) jak wykorzystywana jest w rolnictwie. " +
+        "Każde zdanie powinno mieć od 15 do 20 słów. " +
+        "Nie używaj list, nagłówków ani znaków formatowania Markdown.";
 }
