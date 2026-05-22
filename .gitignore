@@ -13,6 +13,9 @@ x86/
 # BenchmarkDotNet
 BenchmarkDotNet.Artifacts/
 
+# Benchmark PDF output
+output/
+
 # .NET / Visual Studio
 *.user
 *.suo

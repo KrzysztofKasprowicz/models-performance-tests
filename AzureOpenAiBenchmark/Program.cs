@@ -56,4 +56,10 @@ stopwatch.Stop();
 Console.WriteLine();
 Console.WriteLine($"Total wall-clock time: {stopwatch.Elapsed.TotalSeconds:F1} s");
 
-StatisticsReporter.Print(benchmarks);
+var stats = benchmarks.Select(ModelStatistics.From).ToArray();
+StatisticsReporter.PrintConsole(stats);
+
+var outputDirectory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "output");
+var pdfPath = PdfReportGenerator.Save(stats, stopwatch.Elapsed, DateTimeOffset.Now, outputDirectory);
+Console.WriteLine();
+Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");

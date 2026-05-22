@@ -27,6 +27,12 @@ parallelism nor capturing two timing metrics per call.
 Min / Avg / P50 / P75 / P95 / Max for TTFT, Total, and Length.
 The overall wall-clock duration is also printed.
 
+## Output
+
+The run prints results to the console and also writes a formatted PDF
+report to `output/benchmark-YYYYMMDD-HHmmss.pdf` in the repository root.
+The `output/` directory is git-ignored.
+
 ## 1. Authorization (Azure CLI)
 
 Authorization uses `AzureCliCredential` (Microsoft Entra ID, keyless).
