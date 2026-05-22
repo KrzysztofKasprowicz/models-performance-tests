@@ -11,12 +11,10 @@ var configuration = new ConfigurationBuilder()
 var resourceName = configuration["AzureFoundry:ResourceName"]
     ?? throw new InvalidOperationException("Missing user secret 'AzureFoundry:ResourceName'.");
 
-var azureOpenAiEndpoint = new Uri($"https://{resourceName}.openai.azure.com/");
 var foundryEndpoint = new Uri($"https://{resourceName}.services.ai.azure.com/");
-var foundryInferenceEndpoint = new Uri(foundryEndpoint, "models");
 
 TokenCredential credential = new AzureCliCredential();
-var azureOpenAiClient = new AzureOpenAIClient(azureOpenAiEndpoint, credential);
+var openAiClient = new AzureOpenAIClient(foundryEndpoint, credential);
 var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
 var benchmarks = BenchmarkConfig.Deployments
@@ -73,8 +71,7 @@ Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");
 
 IModelInvoker CreateInvoker(DeploymentConfig deployment) => deployment switch
 {
-    AzureOpenAiDeployment aoai => new AzureOpenAiInvoker(aoai, azureOpenAiClient, BenchmarkConfig.Prompt),
-    FoundryInferenceDeployment fi => new FoundryInferenceInvoker(fi, foundryInferenceEndpoint, credential, BenchmarkConfig.Prompt),
+    AzureOpenAiDeployment aoai => new AzureOpenAiInvoker(aoai, openAiClient, BenchmarkConfig.Prompt),
     ClaudeFoundryDeployment claude => new ClaudeFoundryInvoker(claude, foundryEndpoint, credential, BenchmarkConfig.Prompt, httpClient),
     _ => throw new InvalidOperationException($"Unknown deployment type: {deployment.GetType().Name}"),
 };

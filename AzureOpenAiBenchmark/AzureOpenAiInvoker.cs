@@ -17,9 +17,9 @@ public sealed class AzureOpenAiInvoker : IModelInvoker
         Deployment = deployment.Name;
         _chatClient = client.GetChatClient(deployment.Name);
         _options = new ChatCompletionOptions();
-        if (deployment.IsReasoningModel)
+        if (TryGetReasoningEffortLevel(deployment.ReasoningEffort, out var level))
         {
-            _options.ReasoningEffortLevel = ChatReasoningEffortLevel.None;
+            _options.ReasoningEffortLevel = level;
         }
         _messages = [new UserChatMessage(prompt)];
     }
@@ -51,5 +51,32 @@ public sealed class AzureOpenAiInvoker : IModelInvoker
             timeToFirstToken ?? stopwatch.Elapsed,
             stopwatch.Elapsed,
             responseLength);
+    }
+
+    private static bool TryGetReasoningEffortLevel(string? value, out ChatReasoningEffortLevel level)
+    {
+        switch (value)
+        {
+            case "none":
+                level = ChatReasoningEffortLevel.None;
+                return true;
+            case "minimal":
+                level = ChatReasoningEffortLevel.Minimal;
+                return true;
+            case "low":
+                level = ChatReasoningEffortLevel.Low;
+                return true;
+            case "medium":
+                level = ChatReasoningEffortLevel.Medium;
+                return true;
+            case "high":
+                level = ChatReasoningEffortLevel.High;
+                return true;
+            case null:
+                level = default;
+                return false;
+            default:
+                throw new InvalidOperationException($"Unknown reasoning effort level: '{value}'.");
+        }
     }
 }

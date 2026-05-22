@@ -5,24 +5,29 @@ Parallel benchmark for Azure AI Foundry deployments that measures **TTFT**
 instead of BenchmarkDotNet because BDN does not support intra-benchmark
 parallelism nor capturing two timing metrics per call.
 
-The benchmark targets three model families on the same Foundry resource,
-each reached through a different API surface:
+## Transports
 
-| Provider                | SDK / Transport               | Endpoint path                                      |
-|-------------------------|-------------------------------|----------------------------------------------------|
-| Azure OpenAI (`gpt-*`)  | `Azure.AI.OpenAI`             | `https://<resource>.openai.azure.com/`             |
-| Foundry Inference       | `Azure.AI.Inference`          | `https://<resource>.services.ai.azure.com/models`  |
-| Anthropic on Foundry    | raw `HttpClient` (SSE)        | `https://<resource>.services.ai.azure.com/anthropic/v1/messages` |
+The benchmark targets a single Foundry resource and reaches it through two
+API surfaces with the same `AzureCliCredential` (Microsoft Entra ID, keyless):
 
-All three share a single `AzureCliCredential` (Microsoft Entra ID, keyless).
+| Surface                          | SDK                       | Endpoint path                                                       |
+|----------------------------------|---------------------------|---------------------------------------------------------------------|
+| Chat Completions (OpenAI-compat) | `Azure.AI.OpenAI`         | `https://<resource>.services.ai.azure.com/openai/deployments/...`   |
+| Anthropic Messages               | raw `HttpClient` (SSE)    | `https://<resource>.services.ai.azure.com/anthropic/v1/messages`    |
+
+The Chat Completions endpoint serves every OpenAI-compatible deployment in
+Foundry — OpenAI models (`gpt-*`), Microsoft-direct open-weight (`gpt-oss-*`),
+and partner models that Foundry exposes through the same surface (DeepSeek,
+Kimi). Anthropic is on a separate API and needs its own path.
 
 ## Test plan
 
 Currently enabled deployments (`BenchmarkConfig.Deployments`):
 
-- Azure OpenAI: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (with `reasoning_effort = none`)
-- Foundry Inference: `Kimi-K2.6`, `DeepSeek-V4-Flash` (`enable_thinking = false` sent best-effort)
-- Anthropic on Foundry: `claude-sonnet-4-6`, `claude-haiku-4-5` (`thinking.type = disabled`)
+- `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano` (Chat Completions, `reasoning_effort = none`)
+- `gpt-oss-120b` (Chat Completions, `reasoning_effort = low` — model does not accept `none`)
+- `Kimi-K2.6`, `DeepSeek-V4-Flash` (Chat Completions, no `reasoning_effort` sent)
+- `claude-sonnet-4-6`, `claude-haiku-4-5` (Messages API, `thinking.type = disabled`)
 
 Disabled (commented out, easy to re-enable): `gpt-5.1`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`.
 
@@ -58,11 +63,10 @@ az login
 az account set --subscription "<SUBSCRIPTION-NAME-OR-ID>"
 ```
 
-The identity must have:
-
-- **Cognitive Services OpenAI User** — for Azure OpenAI deployments.
-- **Azure AI Developer** (or higher) on the Foundry resource — for Foundry
-  Inference and the Anthropic endpoint.
+The identity must have the **Foundry User** role (formerly *Azure AI User*)
+or **Cognitive Services User** on the Foundry resource (or an ancestor scope).
+*Cognitive Services OpenAI User* alone is not enough — it only grants access
+to OpenAI deployments, not to partner-model paths (Kimi/DeepSeek/Anthropic).
 
 ## 2. Configuration (user secrets)
 
@@ -90,7 +94,7 @@ dotnet run -c Release
 
 In `BenchmarkConfig.cs`:
 
-- `Deployments` — list of deployment configs (Azure OpenAI / Foundry Inference / Claude).
+- `Deployments` — list of deployment configs (Chat Completions / Claude).
 - `Iterations` — sequential iterations per model (default `10`).
 - `CallsPerIteration` — parallel calls within one iteration (default `5`).
 - `WarmupCallsPerModel` — warm-up calls per model (default `1`).

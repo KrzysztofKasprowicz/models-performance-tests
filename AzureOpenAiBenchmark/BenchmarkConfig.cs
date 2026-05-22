@@ -2,10 +2,19 @@ namespace AzureOpenAiBenchmark;
 
 public abstract record DeploymentConfig(string Name);
 
-public sealed record AzureOpenAiDeployment(string Name, bool IsReasoningModel)
-    : DeploymentConfig(Name);
-
-public sealed record FoundryInferenceDeployment(string Name)
+/// <summary>
+/// Any Foundry deployment reachable via the OpenAI-compatible chat completions
+/// endpoint (`/openai/deployments/&lt;name&gt;/chat/completions`). Works for OpenAI
+/// models (gpt-*), Microsoft-direct models (gpt-oss-*), and partner models that
+/// Foundry exposes through the same surface (DeepSeek, Kimi).
+/// </summary>
+/// <param name="Name">Deployment name in the Foundry resource.</param>
+/// <param name="ReasoningEffort">
+/// Optional value for the `reasoning_effort` parameter. Accepted values:
+/// <c>"none"</c>, <c>"minimal"</c>, <c>"low"</c>, <c>"medium"</c>, <c>"high"</c>.
+/// Null = don't send the parameter (use model default).
+/// </param>
+public sealed record AzureOpenAiDeployment(string Name, string? ReasoningEffort = null)
     : DeploymentConfig(Name);
 
 public sealed record ClaudeFoundryDeployment(string Name)
@@ -19,18 +28,22 @@ public static class BenchmarkConfig
 
     public static readonly DeploymentConfig[] Deployments =
     [
-        new AzureOpenAiDeployment("gpt-5.4", IsReasoningModel: true),
-        new AzureOpenAiDeployment("gpt-5.4-mini", IsReasoningModel: true),
-        new AzureOpenAiDeployment("gpt-5.4-nano", IsReasoningModel: true),
+        new AzureOpenAiDeployment("gpt-5.4", ReasoningEffort: "none"),
+        new AzureOpenAiDeployment("gpt-5.4-mini", ReasoningEffort: "none"),
+        new AzureOpenAiDeployment("gpt-5.4-nano", ReasoningEffort: "none"),
+
+        // gpt-oss does not accept reasoning_effort=none; "low" is the lowest supported level.
+        new AzureOpenAiDeployment("gpt-oss-120b", ReasoningEffort: "low"),
 
         // Temporarily disabled — uncomment to re-enable.
-        // new AzureOpenAiDeployment("gpt-5.1", IsReasoningModel: true),
-        // new AzureOpenAiDeployment("gpt-4.1", IsReasoningModel: false),
-        // new AzureOpenAiDeployment("gpt-4.1-mini", IsReasoningModel: false),
-        // new AzureOpenAiDeployment("gpt-4.1-nano", IsReasoningModel: false),
+        // new AzureOpenAiDeployment("gpt-5.1", ReasoningEffort: "none"),
+        // new AzureOpenAiDeployment("gpt-4.1"),
+        // new AzureOpenAiDeployment("gpt-4.1-mini"),
+        // new AzureOpenAiDeployment("gpt-4.1-nano"),
 
-        new FoundryInferenceDeployment("Kimi-K2.6"),
-        new FoundryInferenceDeployment("DeepSeek-V4-Flash"),
+        new AzureOpenAiDeployment("Kimi-K2.6"),
+        new AzureOpenAiDeployment("DeepSeek-V4-Flash"),
+
         new ClaudeFoundryDeployment("claude-sonnet-4-6"),
         new ClaudeFoundryDeployment("claude-haiku-4-5"),
     ];
