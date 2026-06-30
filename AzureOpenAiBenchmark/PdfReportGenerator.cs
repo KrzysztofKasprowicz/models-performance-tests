@@ -35,7 +35,7 @@ public static class PdfReportGenerator
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text("Azure OpenAI Benchmark Report")
+                    col.Item().Text("Azure OpenAI Priority Service Tier Benchmark")
                         .FontSize(20).Bold().FontColor(PrimaryColor);
                     col.Item().Text(
                             $"Generated {generatedAt.LocalDateTime:yyyy-MM-dd HH:mm:ss} " +
@@ -48,8 +48,21 @@ public static class PdfReportGenerator
                 {
                     col.Spacing(20);
                     BuildSummary(col.Item(), stats, wallClock, resourceName, endpoint);
-                    BuildRankingSection(col.Item(), stats);
-                    BuildDetailsSection(col.Item(), stats);
+
+                    foreach (var scenario in Enum.GetValues<BenchmarkScenario>())
+                    {
+                        var scenarioStats = stats.Where(s => s.Scenario == scenario)
+                            .OrderBy(s => s.Deployment).ThenBy(s => s.ReasoningEffort)
+                            .ToArray();
+
+                        if (scenarioStats.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        BuildRankingSection(col.Item(), scenario, scenarioStats);
+                        BuildDetailsSection(col.Item(), scenario, scenarioStats);
+                    }
                 });
 
                 page.Footer().AlignCenter().Text(t =>
@@ -79,10 +92,15 @@ public static class PdfReportGenerator
             col.Item().Text("Configuration").FontSize(13).Bold().FontColor(PrimaryColor);
             col.Item().Text($"Foundry resource: {resourceName}");
             col.Item().Text($"Endpoint: {endpoint}");
-            col.Item().Text($"Models tested: {stats.Count}");
-            col.Item().Text($"Iterations per model: {BenchmarkConfig.Iterations}");
-            col.Item().Text($"Parallel calls per iteration: {BenchmarkConfig.CallsPerIteration}");
-            col.Item().Text($"Warm-up calls per model: {BenchmarkConfig.WarmupCallsPerModel}");
+            col.Item().Text($"Test cells: {stats.Count} (deployments x reasoning effort x scenario)");
+            col.Item().Text(
+                $"Single-turn volume: {BenchmarkConfig.SingleTurnIterations} iterations x " +
+                $"{BenchmarkConfig.SingleTurnCallsPerIteration} parallel calls");
+            col.Item().Text(
+                $"Multi-turn volume: {BenchmarkConfig.MultiTurnIterations} iterations x " +
+                $"{BenchmarkConfig.MultiTurnCallsPerIteration} parallel conversation(s) x " +
+                $"{Prompts.MultiTurnUserMessages.Length} turns");
+            col.Item().Text($"Warm-up calls per cell: {BenchmarkConfig.WarmupCallsPerModel}");
             col.Item().Text($"Per-call timeout: {BenchmarkConfig.CallTimeout.TotalSeconds:F0} s");
             col.Item().Text($"Total billed calls: {stats.Sum(s => s.SampleCount)}");
             col.Item().Text($"Timed-out calls: {stats.Sum(s => s.TimedOutCount)}");
@@ -90,22 +108,22 @@ public static class PdfReportGenerator
         });
     }
 
-    private static void BuildRankingSection(IContainer container, IReadOnlyList<ModelStatistics> stats)
+    private static void BuildRankingSection(IContainer container, BenchmarkScenario scenario, IReadOnlyList<ModelStatistics> stats)
     {
         container.Column(col =>
         {
             col.Spacing(8);
-            col.Item().Text("Ranking by P50").FontSize(13).Bold().FontColor(PrimaryColor);
+            col.Item().Text($"{scenario} — Ranking by P50").FontSize(13).Bold().FontColor(PrimaryColor);
 
             col.Item().Row(row =>
             {
                 row.Spacing(10);
                 row.RelativeItem().Element(c => RenderRanking(c, "TTFT P50 (ms, lower better)",
-                    stats.OrderBy(s => s.TtftMs.P50).Select(s => (s.Deployment, s.TtftMs.P50)).ToArray(), "F1"));
+                    stats.OrderBy(s => s.TtftMs.P50).Select(s => (Label(s), s.TtftMs.P50)).ToArray(), "F1"));
                 row.RelativeItem().Element(c => RenderRanking(c, "Total P50 (ms, lower better)",
-                    stats.OrderBy(s => s.TotalMs.P50).Select(s => (s.Deployment, s.TotalMs.P50)).ToArray(), "F1"));
+                    stats.OrderBy(s => s.TotalMs.P50).Select(s => (Label(s), s.TotalMs.P50)).ToArray(), "F1"));
                 row.RelativeItem().Element(c => RenderRanking(c, "Avg response (chars)",
-                    stats.OrderByDescending(s => s.LengthChars.Avg).Select(s => (s.Deployment, s.LengthChars.Avg)).ToArray(), "F0"));
+                    stats.OrderByDescending(s => s.LengthChars.Avg).Select(s => (Label(s), s.LengthChars.Avg)).ToArray(), "F0"));
             });
         });
     }
@@ -135,12 +153,12 @@ public static class PdfReportGenerator
         });
     }
 
-    private static void BuildDetailsSection(IContainer container, IReadOnlyList<ModelStatistics> stats)
+    private static void BuildDetailsSection(IContainer container, BenchmarkScenario scenario, IReadOnlyList<ModelStatistics> stats)
     {
         container.Column(col =>
         {
             col.Spacing(8);
-            col.Item().Text("Detailed statistics").FontSize(13).Bold().FontColor(PrimaryColor);
+            col.Item().Text($"{scenario} — Detailed statistics").FontSize(13).Bold().FontColor(PrimaryColor);
             col.Item().Table(table =>
             {
                 table.ColumnsDefinition(c =>
@@ -157,7 +175,7 @@ public static class PdfReportGenerator
 
                 table.Header(header =>
                 {
-                    foreach (var label in new[] { "Model", "Metric" })
+                    foreach (var label in new[] { "Model / effort", "Metric" })
                     {
                         header.Cell().Background(HeaderRowColor).Padding(5)
                             .Text(label).Bold().FontSize(9);
@@ -172,8 +190,8 @@ public static class PdfReportGenerator
                 foreach (var s in stats)
                 {
                     var modelLabel = s.TimedOutCount > 0
-                        ? $"{s.Deployment}\n({s.TimedOutCount} timeout{(s.TimedOutCount == 1 ? string.Empty : "s")})"
-                        : s.Deployment;
+                        ? $"{Label(s)}\n({s.TimedOutCount} timeout{(s.TimedOutCount == 1 ? string.Empty : "s")})"
+                        : Label(s);
                     AppendMetricRow(table, modelLabel, "TTFT (ms)", s.TtftMs, "F1", topBorder: true);
                     AppendMetricRow(table, string.Empty, "Total (ms)", s.TotalMs, "F1");
                     AppendMetricRow(table, string.Empty, "Length (chars)", s.LengthChars, "F0");
@@ -181,6 +199,8 @@ public static class PdfReportGenerator
             });
         });
     }
+
+    private static string Label(ModelStatistics s) => $"{s.Deployment} / {s.ReasoningEffort}";
 
     private static void AppendMetricRow(
         TableDescriptor table,

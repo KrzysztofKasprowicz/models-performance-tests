@@ -5,7 +5,7 @@ using AzureOpenAiBenchmark;
 using Microsoft.Extensions.Configuration;
 
 var configuration = new ConfigurationBuilder()
-    .AddUserSecrets(typeof(ModelBenchmark).Assembly)
+    .AddUserSecrets(typeof(BenchmarkConfig).Assembly)
     .Build();
 
 var resourceName = configuration["AzureFoundry:ResourceName"]
@@ -15,25 +15,28 @@ var foundryEndpoint = new Uri($"https://{resourceName}.services.ai.azure.com/");
 
 TokenCredential credential = new AzureCliCredential();
 var openAiClient = new AzureOpenAIClient(foundryEndpoint, credential);
-var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
-var benchmarks = BenchmarkConfig.Deployments
-    .Select(d => new ModelBenchmark(CreateInvoker(d)))
+var benchmarks = BenchmarkConfig.AllCells()
+    .Select(cell => new ModelBenchmark(CreateInvoker(cell)))
     .ToArray();
 
-Console.WriteLine($"Warm-up: {BenchmarkConfig.WarmupCallsPerModel} call(s) per model...");
+Console.WriteLine($"Warm-up: {BenchmarkConfig.WarmupCallsPerModel} call(s) per cell...");
 await Task.WhenAll(benchmarks.Select(b => b.WarmUpAsync(BenchmarkConfig.WarmupCallsPerModel)));
 
-var totalCalls = benchmarks.Length * BenchmarkConfig.Iterations * BenchmarkConfig.CallsPerIteration;
+var totalCalls = benchmarks.Sum(b =>
+{
+    var (iterations, callsPerIteration) = BenchmarkConfig.VolumeFor(b.Scenario);
+    return iterations * callsPerIteration * BenchmarkConfig.TurnsPerCall(b.Scenario);
+});
+
 Console.WriteLine(
-    $"Starting: {benchmarks.Length} models in parallel, " +
-    $"{BenchmarkConfig.Iterations} iterations x {BenchmarkConfig.CallsPerIteration} calls per iteration. " +
+    $"Starting: {benchmarks.Length} test cells (4 deployments x 3 reasoning efforts x 2 scenarios). " +
     $"Total {totalCalls} billed requests.");
 
 var completed = 0;
 var progressLock = new object();
 
-void OnCallCompleted(string deployment, CallResult result)
+void OnCallCompleted(ModelBenchmark benchmark, CallResult result)
 {
     int current;
     lock (progressLock)
@@ -42,21 +45,23 @@ void OnCallCompleted(string deployment, CallResult result)
         current = completed;
     }
 
+    var label = $"{benchmark.Deployment,-14} {benchmark.ReasoningEffort,-6} {benchmark.Scenario}";
     var status = result.TimedOut
         ? $"TIMEOUT after {result.TotalResponseTime.TotalMilliseconds,8:F1} ms  Length={result.ResponseLength,5} chars (partial)"
         : $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
           $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
           $"Length={result.ResponseLength,5} chars";
 
-    Console.WriteLine($"[{current,3}/{totalCalls}] {deployment,-22} {status}");
+    Console.WriteLine($"[{current,4}/{totalCalls}] {label,-38} {status}");
 }
 
 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-await Task.WhenAll(benchmarks.Select(b => b.RunAsync(
-    BenchmarkConfig.Iterations,
-    BenchmarkConfig.CallsPerIteration,
-    OnCallCompleted)));
+await Task.WhenAll(benchmarks.Select(b =>
+{
+    var (iterations, callsPerIteration) = BenchmarkConfig.VolumeFor(b.Scenario);
+    return b.RunAsync(iterations, callsPerIteration, OnCallCompleted);
+}));
 
 stopwatch.Stop();
 
@@ -71,9 +76,9 @@ var pdfPath = PdfReportGenerator.Save(stats, stopwatch.Elapsed, DateTimeOffset.N
 Console.WriteLine();
 Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");
 
-IModelInvoker CreateInvoker(DeploymentConfig deployment) => deployment switch
+IModelInvoker CreateInvoker(BenchmarkCell cell) => cell.Scenario switch
 {
-    AzureOpenAiDeployment aoai => new AzureOpenAiInvoker(aoai, openAiClient, BenchmarkConfig.Prompt),
-    ClaudeFoundryDeployment claude => new ClaudeFoundryInvoker(claude, foundryEndpoint, credential, BenchmarkConfig.Prompt, httpClient),
-    _ => throw new InvalidOperationException($"Unknown deployment type: {deployment.GetType().Name}"),
+    BenchmarkScenario.SingleTurn => new SingleTurnInvoker(cell, openAiClient),
+    BenchmarkScenario.MultiTurn => new MultiTurnInvoker(cell, openAiClient),
+    _ => throw new InvalidOperationException($"Unknown scenario: {cell.Scenario}"),
 };

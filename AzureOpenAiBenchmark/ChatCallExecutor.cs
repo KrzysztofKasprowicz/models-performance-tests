@@ -1,0 +1,57 @@
+using System.Diagnostics;
+using OpenAI.Chat;
+
+namespace AzureOpenAiBenchmark;
+
+/// <summary>
+/// Streams one chat completion call and measures time-to-first-token / total time / response
+/// length. Shared by both single-turn and multi-turn invokers — the only difference between
+/// them is what message list they pass in.
+/// </summary>
+public static class ChatCallExecutor
+{
+    public static async Task<CallResult> ExecuteAsync(
+        ChatClient chatClient,
+        IEnumerable<ChatMessage> messages,
+        ChatCompletionOptions options,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(BenchmarkConfig.CallTimeout);
+
+        var stopwatch = Stopwatch.StartNew();
+        TimeSpan? timeToFirstToken = null;
+        var responseLength = 0;
+        var timedOut = false;
+
+        try
+        {
+            await foreach (var update in chatClient
+                               .CompleteChatStreamingAsync(messages, options, timeoutCts.Token)
+                               .ConfigureAwait(false))
+            {
+                foreach (var part in update.ContentUpdate)
+                {
+                    if (string.IsNullOrEmpty(part.Text))
+                    {
+                        continue;
+                    }
+
+                    timeToFirstToken ??= stopwatch.Elapsed;
+                    responseLength += part.Text.Length;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            timedOut = true;
+        }
+
+        stopwatch.Stop();
+        return new CallResult(
+            timeToFirstToken ?? stopwatch.Elapsed,
+            stopwatch.Elapsed,
+            responseLength,
+            timedOut);
+    }
+}

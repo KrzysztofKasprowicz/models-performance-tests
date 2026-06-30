@@ -3,6 +3,9 @@ namespace AzureOpenAiBenchmark;
 public interface IModelInvoker
 {
     string Deployment { get; }
+    string ReasoningEffort { get; }
+    BenchmarkScenario Scenario { get; }
+    bool IsPriority { get; }
 
-    Task<CallResult> MeasureSingleCallAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<CallResult>> MeasureAsync(CancellationToken cancellationToken);
 }

@@ -7,6 +7,9 @@ public sealed class ModelBenchmark
     private readonly object _resultsLock = new();
 
     public string Deployment => _invoker.Deployment;
+    public string ReasoningEffort => _invoker.ReasoningEffort;
+    public BenchmarkScenario Scenario => _invoker.Scenario;
+    public bool IsPriority => _invoker.IsPriority;
     public IReadOnlyList<CallResult> Results => _results;
 
     public ModelBenchmark(IModelInvoker invoker)
@@ -18,14 +21,14 @@ public sealed class ModelBenchmark
     {
         for (var i = 0; i < calls; i++)
         {
-            _ = await _invoker.MeasureSingleCallAsync(cancellationToken);
+            _ = await _invoker.MeasureAsync(cancellationToken);
         }
     }
 
     public async Task RunAsync(
         int iterations,
         int callsPerIteration,
-        Action<string, CallResult> onCallCompleted,
+        Action<ModelBenchmark, CallResult> onCallCompleted,
         CancellationToken cancellationToken = default)
     {
         for (var iteration = 0; iteration < iterations; iteration++)
@@ -33,13 +36,15 @@ public sealed class ModelBenchmark
             var tasks = Enumerable.Range(0, callsPerIteration)
                 .Select(async _ =>
                 {
-                    var result = await _invoker.MeasureSingleCallAsync(cancellationToken);
-                    lock (_resultsLock)
+                    var callResults = await _invoker.MeasureAsync(cancellationToken).ConfigureAwait(false);
+                    foreach (var result in callResults)
                     {
-                        _results.Add(result);
+                        lock (_resultsLock)
+                        {
+                            _results.Add(result);
+                        }
+                        onCallCompleted(this, result);
                     }
-                    onCallCompleted(Deployment, result);
-                    return result;
                 })
                 .ToArray();
 

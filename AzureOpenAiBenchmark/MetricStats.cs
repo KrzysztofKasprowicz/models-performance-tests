@@ -44,6 +44,9 @@ public sealed record MetricStats(
 
 public sealed record ModelStatistics(
     string Deployment,
+    string ReasoningEffort,
+    BenchmarkScenario Scenario,
+    bool IsPriority,
     int SampleCount,
     int TimedOutCount,
     MetricStats TtftMs,
@@ -52,6 +55,9 @@ public sealed record ModelStatistics(
 {
     public static ModelStatistics From(ModelBenchmark benchmark) => new(
         benchmark.Deployment,
+        benchmark.ReasoningEffort,
+        benchmark.Scenario,
+        benchmark.IsPriority,
         benchmark.Results.Count,
         benchmark.Results.Count(r => r.TimedOut),
         MetricStats.From(benchmark.Results.Select(r => r.TimeToFirstToken.TotalMilliseconds)),
