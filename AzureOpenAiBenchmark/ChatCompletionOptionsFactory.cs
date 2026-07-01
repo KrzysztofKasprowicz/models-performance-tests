@@ -4,9 +4,10 @@ namespace AzureOpenAiBenchmark;
 
 /// <summary>
 /// Builds <see cref="ChatCompletionOptions"/> for a benchmark cell: reasoning effort is always
-/// set (every cell in the matrix specifies one), and the priority service tier is requested
-/// only for "-prio" deployments — see
-/// https://learn.microsoft.com/azure/foundry/openai/concepts/priority-processing.
+/// set (every cell in the matrix specifies one). The priority service tier is NOT set here —
+/// "-prio" deployments have it configured at the deployment level in Azure, which is enough on
+/// its own per https://learn.microsoft.com/azure/foundry/openai/concepts/priority-processing
+/// (deployment-level "priority" + request-level "auto" still routes to priority processing).
 /// </summary>
 public static class ChatCompletionOptionsFactory
 {
@@ -24,18 +25,13 @@ public static class ChatCompletionOptionsFactory
     /// </summary>
     private const int MaxOutputTokens = 4096;
 
-    public static ChatCompletionOptions Create(string reasoningEffort, bool isPriority)
+    public static ChatCompletionOptions Create(string reasoningEffort)
     {
         var options = new ChatCompletionOptions
         {
             ReasoningEffortLevel = ToReasoningEffortLevel(reasoningEffort),
         };
         options.Patch.Set("$.max_completion_tokens"u8, MaxOutputTokens);
-
-        if (isPriority)
-        {
-            options.ServiceTier = "priority";
-        }
 
         return options;
     }

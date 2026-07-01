@@ -20,7 +20,7 @@ public sealed class SingleTurnInvoker : IModelInvoker
         ReasoningEffort = cell.ReasoningEffort;
         IsPriority = cell.IsPriority;
         _chatClient = client.GetChatClient(cell.DeploymentName);
-        _options = ChatCompletionOptionsFactory.Create(cell.ReasoningEffort, cell.IsPriority);
+        _options = ChatCompletionOptionsFactory.Create(cell.ReasoningEffort);
         _messages =
         [
             new SystemChatMessage(Prompts.SystemPrompt),
