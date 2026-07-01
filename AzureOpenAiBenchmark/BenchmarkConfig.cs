@@ -5,6 +5,14 @@ public static class BenchmarkConfig
     public const int WarmupCallsPerModel = 1;
     public static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(25);
 
+    /// <summary>
+    /// Delay between starting successive test cells that share the same underlying deployment.
+    /// Without this, all 6 cells for one deployment (3 reasoning efforts x 2 scenarios) fire
+    /// their first calls in the same instant, competing for that one deployment's per-minute
+    /// token quota right out of the gate.
+    /// </summary>
+    public static readonly TimeSpan DeploymentStartStagger = TimeSpan.FromMilliseconds(500);
+
     public static readonly string[] DeploymentNames =
     [
         "gpt-5.4",
@@ -15,10 +23,10 @@ public static class BenchmarkConfig
 
     public static readonly string[] ReasoningEfforts = ["none", "low", "medium"];
 
-    public const int SingleTurnIterations = 8;
+    public const int SingleTurnIterations = 12;
     public const int SingleTurnCallsPerIteration = 2;
 
-    public const int MultiTurnIterations = 5;
+    public const int MultiTurnIterations = 8;
     public const int MultiTurnCallsPerIteration = 1;
 
     public static (int Iterations, int CallsPerIteration) VolumeFor(BenchmarkScenario scenario) => scenario switch

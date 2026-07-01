@@ -49,6 +49,7 @@ public sealed record ModelStatistics(
     bool IsPriority,
     int SampleCount,
     int TimedOutCount,
+    int FailedCount,
     MetricStats TtftMs,
     MetricStats TotalMs,
     MetricStats LengthChars)
@@ -60,6 +61,7 @@ public sealed record ModelStatistics(
         benchmark.IsPriority,
         benchmark.Results.Count,
         benchmark.Results.Count(r => r.TimedOut),
+        benchmark.Results.Count(r => r.FailedStatusCode.HasValue),
         MetricStats.From(benchmark.Results.Select(r => r.TimeToFirstToken.TotalMilliseconds)),
         MetricStats.From(benchmark.Results.Select(r => r.TotalResponseTime.TotalMilliseconds)),
         MetricStats.From(benchmark.Results.Select(r => (double)r.ResponseLength)));

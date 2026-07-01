@@ -104,6 +104,7 @@ public static class PdfReportGenerator
             col.Item().Text($"Per-call timeout: {BenchmarkConfig.CallTimeout.TotalSeconds:F0} s");
             col.Item().Text($"Total billed calls: {stats.Sum(s => s.SampleCount)}");
             col.Item().Text($"Timed-out calls: {stats.Sum(s => s.TimedOutCount)}");
+            col.Item().Text($"Failed calls (rate-limited/transient errors): {stats.Sum(s => s.FailedCount)}");
             col.Item().Text($"Wall-clock duration: {wallClock.TotalSeconds:F1} s");
         });
     }
@@ -189,9 +190,16 @@ public static class PdfReportGenerator
 
                 foreach (var s in stats)
                 {
-                    var modelLabel = s.TimedOutCount > 0
-                        ? $"{Label(s)}\n({s.TimedOutCount} timeout{(s.TimedOutCount == 1 ? string.Empty : "s")})"
-                        : Label(s);
+                    var notes = new List<string>();
+                    if (s.TimedOutCount > 0)
+                    {
+                        notes.Add($"{s.TimedOutCount} timeout{(s.TimedOutCount == 1 ? string.Empty : "s")}");
+                    }
+                    if (s.FailedCount > 0)
+                    {
+                        notes.Add($"{s.FailedCount} failed");
+                    }
+                    var modelLabel = notes.Count > 0 ? $"{Label(s)}\n({string.Join(", ", notes)})" : Label(s);
                     AppendMetricRow(table, modelLabel, "TTFT (ms)", s.TtftMs, "F1", topBorder: true);
                     AppendMetricRow(table, string.Empty, "Total (ms)", s.TotalMs, "F1");
                     AppendMetricRow(table, string.Empty, "Length (chars)", s.LengthChars, "F0");

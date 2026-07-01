@@ -10,11 +10,20 @@ namespace AzureOpenAiBenchmark;
 /// </summary>
 public static class ChatCompletionOptionsFactory
 {
+    /// <summary>
+    /// Caps reasoning + visible output tokens per call. Without this, a single reasoning-heavy
+    /// call has no upper bound on hidden reasoning-token spend, which can burn through a
+    /// deployment's per-minute token quota and throttle every other concurrent cell sharing
+    /// that same deployment — turning a quota problem into noise in the latency numbers.
+    /// </summary>
+    private const int MaxOutputTokens = 4096;
+
     public static ChatCompletionOptions Create(string reasoningEffort, bool isPriority)
     {
         var options = new ChatCompletionOptions
         {
             ReasoningEffortLevel = ToReasoningEffortLevel(reasoningEffort),
+            MaxOutputTokenCount = MaxOutputTokens,
         };
 
         if (isPriority)

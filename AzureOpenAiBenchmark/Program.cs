@@ -46,22 +46,40 @@ void OnCallCompleted(ModelBenchmark benchmark, CallResult result)
     }
 
     var label = $"{benchmark.Deployment,-14} {benchmark.ReasoningEffort,-6} {benchmark.Scenario}";
-    var status = result.TimedOut
-        ? $"TIMEOUT after {result.TotalResponseTime.TotalMilliseconds,8:F1} ms  Length={result.ResponseLength,5} chars (partial)"
-        : $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
-          $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
-          $"Length={result.ResponseLength,5} chars";
+    var status = result.FailedStatusCode.HasValue
+        ? $"FAILED (HTTP {result.FailedStatusCode}) after {result.TotalResponseTime.TotalMilliseconds,8:F1} ms"
+        : result.TimedOut
+            ? $"TIMEOUT after {result.TotalResponseTime.TotalMilliseconds,8:F1} ms  Length={result.ResponseLength,5} chars (partial)"
+            : $"TTFT={result.TimeToFirstToken.TotalMilliseconds,7:F1} ms  " +
+              $"Total={result.TotalResponseTime.TotalMilliseconds,8:F1} ms  " +
+              $"Length={result.ResponseLength,5} chars";
 
     Console.WriteLine($"[{current,4}/{totalCalls}] {label,-38} {status}");
 }
 
 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
+var deploymentStartIndex = new Dictionary<string, int>();
+
 await Task.WhenAll(benchmarks.Select(b =>
 {
+    var index = deploymentStartIndex.TryGetValue(b.Deployment, out var n) ? n : 0;
+    deploymentStartIndex[b.Deployment] = index + 1;
+    var stagger = BenchmarkConfig.DeploymentStartStagger * index;
+
     var (iterations, callsPerIteration) = BenchmarkConfig.VolumeFor(b.Scenario);
-    return b.RunAsync(iterations, callsPerIteration, OnCallCompleted);
+    return RunStaggeredAsync(b, stagger, iterations, callsPerIteration);
 }));
+
+async Task RunStaggeredAsync(ModelBenchmark benchmark, TimeSpan delay, int iterations, int callsPerIteration)
+{
+    if (delay > TimeSpan.Zero)
+    {
+        await Task.Delay(delay);
+    }
+
+    await benchmark.RunAsync(iterations, callsPerIteration, OnCallCompleted);
+}
 
 stopwatch.Stop();
 

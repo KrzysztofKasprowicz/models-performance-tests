@@ -20,7 +20,8 @@ public static class StatisticsReporter
                 PrintRow(string.Empty, string.Empty, "Total", s.TotalMs, "F1");
                 PrintRow(string.Empty, string.Empty, "Length", s.LengthChars, "F0", "   (chars)");
                 var timeoutNote = s.TimedOutCount > 0 ? $", timeouts: {s.TimedOutCount} (>{BenchmarkConfig.CallTimeout.TotalSeconds:F0}s)" : string.Empty;
-                Console.WriteLine($"{string.Empty,-18} {string.Empty,-7} samples: {s.SampleCount}{timeoutNote}");
+                var failedNote = s.FailedCount > 0 ? $", failed: {s.FailedCount}" : string.Empty;
+                Console.WriteLine($"{string.Empty,-18} {string.Empty,-7} samples: {s.SampleCount}{timeoutNote}{failedNote}");
                 Console.WriteLine(new string('-', 110));
             }
         }

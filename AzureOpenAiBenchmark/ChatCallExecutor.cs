@@ -1,3 +1,4 @@
+using System.ClientModel;
 using System.Diagnostics;
 using OpenAI.Chat;
 
@@ -23,6 +24,7 @@ public static class ChatCallExecutor
         TimeSpan? timeToFirstToken = null;
         var responseLength = 0;
         var timedOut = false;
+        int? failedStatusCode = null;
 
         try
         {
@@ -46,12 +48,20 @@ public static class ChatCallExecutor
         {
             timedOut = true;
         }
+        catch (ClientResultException ex)
+        {
+            // A 429 (rate limit) or transient 5xx from Azure shouldn't take down the whole
+            // benchmark run — record it as one failed sample instead of letting it propagate
+            // through Task.WhenAll and lose every already-collected result.
+            failedStatusCode = ex.Status;
+        }
 
         stopwatch.Stop();
         return new CallResult(
             timeToFirstToken ?? stopwatch.Elapsed,
             stopwatch.Elapsed,
             responseLength,
-            timedOut);
+            timedOut,
+            failedStatusCode);
     }
 }
