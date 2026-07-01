@@ -15,6 +15,12 @@ public static class ChatCompletionOptionsFactory
     /// call has no upper bound on hidden reasoning-token spend, which can burn through a
     /// deployment's per-minute token quota and throttle every other concurrent cell sharing
     /// that same deployment — turning a quota problem into noise in the latency numbers.
+    ///
+    /// Set via the raw JSON patch, not <see cref="ChatCompletionOptions.MaxOutputTokenCount"/>:
+    /// that property serializes to the legacy "max_tokens" field, which gpt-5.4/gpt-5.5 reject
+    /// outright ("Unsupported parameter: 'max_tokens' ... Use 'max_completion_tokens' instead").
+    /// The SDK's automatic max_tokens -> max_completion_tokens remapping only kicks in for
+    /// model names it recognizes as reasoning models, and doesn't know about gpt-5.4/gpt-5.5.
     /// </summary>
     private const int MaxOutputTokens = 4096;
 
@@ -23,8 +29,8 @@ public static class ChatCompletionOptionsFactory
         var options = new ChatCompletionOptions
         {
             ReasoningEffortLevel = ToReasoningEffortLevel(reasoningEffort),
-            MaxOutputTokenCount = MaxOutputTokens,
         };
+        options.Patch.Set("$.max_completion_tokens"u8, MaxOutputTokens);
 
         if (isPriority)
         {
