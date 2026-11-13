@@ -1,20 +1,20 @@
 using System.ClientModel;
 using System.Diagnostics;
-using OpenAI.Chat;
+using Anthropic.Exceptions;
 
 namespace AzureOpenAiBenchmark;
 
 /// <summary>
-/// Streams one chat completion call and measures time-to-first-token / total time / response
-/// length. Shared by both single-turn and multi-turn invokers — the only difference between
-/// them is what message list they pass in.
+/// Streams one reply and measures time-to-first-token / total time / response length. Shared by
+/// both single-turn and multi-turn invokers and by every provider API — the only differences are
+/// which conversation is passed in and which <see cref="IChatModel"/> streams it.
 /// </summary>
 public static class ChatCallExecutor
 {
     public static async Task<CallResult> ExecuteAsync(
-        ChatClient chatClient,
-        IEnumerable<ChatMessage> messages,
-        ChatCompletionOptions options,
+        IChatModel chatModel,
+        string systemPrompt,
+        IReadOnlyList<ConversationMessage> conversation,
         CancellationToken cancellationToken)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -28,32 +28,28 @@ public static class ChatCallExecutor
 
         try
         {
-            await foreach (var update in chatClient
-                               .CompleteChatStreamingAsync(messages, options, timeoutCts.Token)
+            await foreach (var text in chatModel
+                               .StreamReplyTextAsync(systemPrompt, conversation, timeoutCts.Token)
                                .ConfigureAwait(false))
             {
-                foreach (var part in update.ContentUpdate)
-                {
-                    if (string.IsNullOrEmpty(part.Text))
-                    {
-                        continue;
-                    }
-
-                    timeToFirstToken ??= stopwatch.Elapsed;
-                    responseLength += part.Text.Length;
-                }
+                timeToFirstToken ??= stopwatch.Elapsed;
+                responseLength += text.Length;
             }
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             timedOut = true;
         }
+        // A 429 (rate limit) or transient 5xx from Azure shouldn't take down the whole benchmark
+        // run — record it as one failed sample instead of letting it propagate through
+        // Task.WhenAll and lose every already-collected result.
         catch (ClientResultException ex)
         {
-            // A 429 (rate limit) or transient 5xx from Azure shouldn't take down the whole
-            // benchmark run — record it as one failed sample instead of letting it propagate
-            // through Task.WhenAll and lose every already-collected result.
             failedStatusCode = ex.Status;
+        }
+        catch (AnthropicApiException ex)
+        {
+            failedStatusCode = (int)ex.StatusCode;
         }
 
         stopwatch.Stop();

@@ -15,13 +15,14 @@ public static class BenchmarkConfig
 
     private static readonly string[] AllReasoningEfforts = ["none", "low", "medium"];
 
-    public static readonly (string DeploymentName, string[] ReasoningEfforts)[] Deployments =
+    public static readonly BenchmarkDeployment[] Deployments =
     [
-        ("gpt-5.4-mini", AllReasoningEfforts),
-        ("gpt-6-luna", AllReasoningEfforts),
-        ("gpt-6.1-terra", AllReasoningEfforts),
+        new("gpt-5.4-mini", ModelApi.AzureOpenAiChatCompletions, AllReasoningEfforts),
+        new("gpt-6-luna", ModelApi.AzureOpenAiChatCompletions, AllReasoningEfforts),
+        new("gpt-6.1-terra", ModelApi.AzureOpenAiChatCompletions, AllReasoningEfforts),
         // gpt-oss does not accept reasoning_effort=none.
-        ("gpt-oss-120b", ["low", "medium"]),
+        new("gpt-oss-120b", ModelApi.AzureOpenAiChatCompletions, ["low", "medium"]),
+        new("claude-haiku-5-5", ModelApi.AnthropicMessages, AllReasoningEfforts),
     ];
 
     public const int SingleTurnIterations = 12;
@@ -48,5 +49,5 @@ public static class BenchmarkConfig
         from deployment in Deployments
         from reasoningEffort in deployment.ReasoningEfforts
         from scenario in Enum.GetValues<BenchmarkScenario>()
-        select new BenchmarkCell(deployment.DeploymentName, reasoningEffort, scenario);
+        select new BenchmarkCell(deployment.Name, deployment.Api, reasoningEffort, scenario);
 }

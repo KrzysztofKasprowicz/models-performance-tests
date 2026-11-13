@@ -1,6 +1,3 @@
-using Azure.AI.OpenAI;
-using OpenAI.Chat;
-
 namespace AzureOpenAiBenchmark;
 
 /// <summary>
@@ -10,39 +7,37 @@ namespace AzureOpenAiBenchmark;
 /// </summary>
 public sealed class MultiTurnInvoker : IModelInvoker
 {
-    private readonly ChatClient _chatClient;
-    private readonly ChatCompletionOptions _options;
+    private readonly IChatModel _chatModel;
 
     public string Deployment { get; }
     public string ReasoningEffort { get; }
     public BenchmarkScenario Scenario => BenchmarkScenario.MultiTurn;
     public bool IsPriority { get; }
 
-    public MultiTurnInvoker(BenchmarkCell cell, AzureOpenAIClient client)
+    public MultiTurnInvoker(BenchmarkCell cell, IChatModel chatModel)
     {
         Deployment = cell.DeploymentName;
         ReasoningEffort = cell.ReasoningEffort;
         IsPriority = cell.IsPriority;
-        _chatClient = client.GetChatClient(cell.DeploymentName);
-        _options = ChatCompletionOptionsFactory.Create(cell.ReasoningEffort);
+        _chatModel = chatModel;
     }
 
     public async Task<IReadOnlyList<CallResult>> MeasureAsync(CancellationToken cancellationToken)
     {
-        var history = new List<ChatMessage> { new SystemChatMessage(Prompts.SystemPrompt) };
+        var history = new List<ConversationMessage>();
         var results = new List<CallResult>(Prompts.MultiTurnUserMessages.Length);
 
         for (var turn = 0; turn < Prompts.MultiTurnUserMessages.Length; turn++)
         {
-            history.Add(new UserChatMessage(Prompts.MultiTurnUserMessages[turn]));
+            history.Add(new ConversationMessage(ConversationRole.User, Prompts.MultiTurnUserMessages[turn]));
 
-            var result = await ChatCallExecutor.ExecuteAsync(_chatClient, history, _options, cancellationToken)
+            var result = await ChatCallExecutor.ExecuteAsync(_chatModel, Prompts.SystemPrompt, history, cancellationToken)
                 .ConfigureAwait(false);
             results.Add(result);
 
             if (turn < Prompts.MultiTurnFixedAssistantReplies.Length)
             {
-                history.Add(new AssistantChatMessage(Prompts.MultiTurnFixedAssistantReplies[turn]));
+                history.Add(new ConversationMessage(ConversationRole.Assistant, Prompts.MultiTurnFixedAssistantReplies[turn]));
             }
         }
 

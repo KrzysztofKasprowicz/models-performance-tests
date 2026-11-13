@@ -1,3 +1,4 @@
+using Anthropic.Foundry;
 using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Identity;
@@ -13,14 +14,10 @@ var resourceName = configuration["AzureFoundry:ResourceName"]
 
 var foundryEndpoint = new Uri($"https://{resourceName}.services.ai.azure.com/");
 
-TokenCredential credential = new AzureCliCredential();
-
-// Force one sequential token acquisition before any concurrent work starts. Without this,
-// the first batch of concurrent calls each spawn their own "az account get-access-token"
-// subprocess and race on the Azure CLI's on-disk token cache lock file.
-await credential.GetTokenAsync(new TokenRequestContext(["https://cognitiveservices.azure.com/.default"]), default);
+TokenCredential credential = new CachingTokenCredential(new AzureCliCredential());
 
 var openAiClient = new AzureOpenAIClient(foundryEndpoint, credential);
+var anthropicClient = new AnthropicFoundryClient(new AnthropicFoundryIdentityTokenCredentials(credential, resourceName));
 
 var benchmarks = BenchmarkConfig.AllCells()
     .Select(cell => new ModelBenchmark(CreateInvoker(cell)))
@@ -102,7 +99,14 @@ Console.WriteLine($"PDF report saved to: {Path.GetFullPath(pdfPath)}");
 
 IModelInvoker CreateInvoker(BenchmarkCell cell) => cell.Scenario switch
 {
-    BenchmarkScenario.SingleTurn => new SingleTurnInvoker(cell, openAiClient),
-    BenchmarkScenario.MultiTurn => new MultiTurnInvoker(cell, openAiClient),
+    BenchmarkScenario.SingleTurn => new SingleTurnInvoker(cell, CreateChatModel(cell)),
+    BenchmarkScenario.MultiTurn => new MultiTurnInvoker(cell, CreateChatModel(cell)),
     _ => throw new InvalidOperationException($"Unknown scenario: {cell.Scenario}"),
+};
+
+IChatModel CreateChatModel(BenchmarkCell cell) => cell.Api switch
+{
+    ModelApi.AzureOpenAiChatCompletions => new AzureOpenAiChatModel(openAiClient, cell.DeploymentName, cell.ReasoningEffort),
+    ModelApi.AnthropicMessages => new ClaudeChatModel(anthropicClient, cell.DeploymentName, cell.ReasoningEffort),
+    _ => throw new InvalidOperationException($"Unknown model API: {cell.Api}"),
 };
