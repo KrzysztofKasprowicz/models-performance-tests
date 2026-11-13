@@ -14,6 +14,12 @@ var resourceName = configuration["AzureFoundry:ResourceName"]
 var foundryEndpoint = new Uri($"https://{resourceName}.services.ai.azure.com/");
 
 TokenCredential credential = new AzureCliCredential();
+
+// Force one sequential token acquisition before any concurrent work starts. Without this,
+// the first batch of concurrent calls each spawn their own "az account get-access-token"
+// subprocess and race on the Azure CLI's on-disk token cache lock file.
+await credential.GetTokenAsync(new TokenRequestContext(["https://cognitiveservices.azure.com/.default"]), default);
+
 var openAiClient = new AzureOpenAIClient(foundryEndpoint, credential);
 
 var benchmarks = BenchmarkConfig.AllCells()
@@ -30,7 +36,7 @@ var totalCalls = benchmarks.Sum(b =>
 });
 
 Console.WriteLine(
-    $"Starting: {benchmarks.Length} test cells (4 deployments x 3 reasoning efforts x 2 scenarios). " +
+    $"Starting: {benchmarks.Length} test cells across {BenchmarkConfig.Deployments.Length} deployments. " +
     $"Total {totalCalls} billed requests.");
 
 var completed = 0;

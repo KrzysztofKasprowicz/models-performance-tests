@@ -7,21 +7,22 @@ public static class BenchmarkConfig
 
     /// <summary>
     /// Delay between starting successive test cells that share the same underlying deployment.
-    /// Without this, all 6 cells for one deployment (3 reasoning efforts x 2 scenarios) fire
+    /// Without this, all cells for one deployment (reasoning efforts x scenarios) fire
     /// their first calls in the same instant, competing for that one deployment's per-minute
     /// token quota right out of the gate.
     /// </summary>
     public static readonly TimeSpan DeploymentStartStagger = TimeSpan.FromMilliseconds(500);
 
-    public static readonly string[] DeploymentNames =
-    [
-        "gpt-5.4",
-        "gpt-5.5",
-        "gpt-5.4-prio",
-        "gpt-5.5-prio",
-    ];
+    private static readonly string[] AllReasoningEfforts = ["none", "low", "medium"];
 
-    public static readonly string[] ReasoningEfforts = ["none", "low", "medium"];
+    public static readonly (string DeploymentName, string[] ReasoningEfforts)[] Deployments =
+    [
+        ("gpt-5.4-mini", AllReasoningEfforts),
+        ("gpt-6-luna", AllReasoningEfforts),
+        ("gpt-6.1-terra", AllReasoningEfforts),
+        // gpt-oss does not accept reasoning_effort=none.
+        ("gpt-oss-120b", ["low", "medium"]),
+    ];
 
     public const int SingleTurnIterations = 12;
     public const int SingleTurnCallsPerIteration = 2;
@@ -44,8 +45,8 @@ public static class BenchmarkConfig
     };
 
     public static IEnumerable<BenchmarkCell> AllCells() =>
-        from deploymentName in DeploymentNames
-        from reasoningEffort in ReasoningEfforts
+        from deployment in Deployments
+        from reasoningEffort in deployment.ReasoningEfforts
         from scenario in Enum.GetValues<BenchmarkScenario>()
-        select new BenchmarkCell(deploymentName, reasoningEffort, scenario);
+        select new BenchmarkCell(deployment.DeploymentName, reasoningEffort, scenario);
 }
