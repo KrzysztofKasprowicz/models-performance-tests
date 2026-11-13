@@ -109,8 +109,10 @@ public static class PdfReportGenerator
         });
     }
 
-    private static void BuildRankingSection(IContainer container, BenchmarkScenario scenario, IReadOnlyList<ModelStatistics> stats)
+    private static void BuildRankingSection(IContainer container, BenchmarkScenario scenario, IReadOnlyList<ModelStatistics> scenarioStats)
     {
+        var stats = scenarioStats.Where(s => s.HasSuccessfulSamples).ToArray();
+
         container.Column(col =>
         {
             col.Spacing(8);

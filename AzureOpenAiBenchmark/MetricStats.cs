@@ -54,15 +54,22 @@ public sealed record ModelStatistics(
     MetricStats TotalMs,
     MetricStats LengthChars)
 {
-    public static ModelStatistics From(ModelBenchmark benchmark) => new(
-        benchmark.Deployment,
-        benchmark.ReasoningEffort,
-        benchmark.Scenario,
-        benchmark.IsPriority,
-        benchmark.Results.Count,
-        benchmark.Results.Count(r => r.TimedOut),
-        benchmark.Results.Count(r => r.FailedStatusCode.HasValue),
-        MetricStats.From(benchmark.Results.Select(r => r.TimeToFirstToken.TotalMilliseconds)),
-        MetricStats.From(benchmark.Results.Select(r => r.TotalResponseTime.TotalMilliseconds)),
-        MetricStats.From(benchmark.Results.Select(r => (double)r.ResponseLength)));
+    public bool HasSuccessfulSamples => FailedCount < SampleCount;
+
+    public static ModelStatistics From(ModelBenchmark benchmark)
+    {
+        var answered = benchmark.Results.Where(r => !r.FailedStatusCode.HasValue).ToArray();
+
+        return new(
+            benchmark.Deployment,
+            benchmark.ReasoningEffort,
+            benchmark.Scenario,
+            benchmark.IsPriority,
+            benchmark.Results.Count,
+            benchmark.Results.Count(r => r.TimedOut),
+            benchmark.Results.Count - answered.Length,
+            MetricStats.From(answered.Select(r => r.TimeToFirstToken.TotalMilliseconds)),
+            MetricStats.From(answered.Select(r => r.TotalResponseTime.TotalMilliseconds)),
+            MetricStats.From(answered.Select(r => (double)r.ResponseLength)));
+    }
 }
